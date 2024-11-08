@@ -274,16 +274,20 @@ protected:
   void close_connection();
 
   /**
-   * @brief Get column index of IP packet reassembles failed from `/proc/net/snmp`
+   * @brief Get index for `/proc/net/snmp`
+   * @param [in] header_protocol_name Protocol name (the first column string). e.g. "Ip:" or "Udp:""
+   * @param [in] header_metrics_name Metrics name. e.g. "ReasmFails"
+   * @return index (row, col)
    */
-  void get_reassembles_failed_column_index();
+  std::pair<int32_t, int32_t> get_index_for_net_snmp(const std::string & header_protocol_name, const std::string & header_metrics_name);
 
   /**
-   * @brief get IP packet reassembles failed
-   * @param [out] reassembles_failed IP packet reassembles failed
+   * @brief Get value from `/proc/net/snmp`
+   * @param [in] index index (row, col)
+   * @param [out] output_value retrieved value
    * @return execution result
    */
-  bool get_reassembles_failed(uint64_t & reassembles_failed);
+  bool get_value_from_net_snmp(const std::pair<int32_t, int32_t> & index, uint64_t & output_value);
 
   diagnostic_updater::Updater updater_;  //!< @brief Updater class which advertises to /diagnostics
   rclcpp::TimerBase::SharedPtr timer_;   //!< @brief timer to get Network information
@@ -315,8 +319,11 @@ protected:
     reassembles_failed_check_duration_;  //!< @brief IP packet reassembles failed check duration
   unsigned int
     reassembles_failed_check_count_;  //!< @brief IP packet reassembles failed check count threshold
-  unsigned int reassembles_failed_column_index_;  //!< @brief column index of IP Reassembles failed
-                                                  //!< in /proc/net/snmp
+  std::pair<int32_t, int32_t> reassembles_failed_index_;  //!< @brief index of IP Reassembles failed
+                                                          //!< in /proc/net/snmp
+  std::pair<int32_t, int32_t> udp_rcv_buf_errors_index_;  //!< @brief index of UDP errors in /proc/net/snmp
+  std::pair<int32_t, int32_t> udp_snd_buf_errors_index_;  //!< @brief index of UDP errors in /proc/net/snmp
+
 
   /**
    * @brief Network connection status messages
