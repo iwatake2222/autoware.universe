@@ -36,6 +36,8 @@ CenterPointTRT::CenterPointTRT(
   const DensificationParam & densification_param, const CenterPointConfig & config)
 : config_(config)
 {
+  cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
+
   vg_ptr_ = std::make_unique<VoxelGenerator>(densification_param, config_);
   post_proc_ptr_ = std::make_unique<PostProcessCUDA>(config_);
 
@@ -61,6 +63,8 @@ CenterPointTRT::CenterPointTRT(
 
   initPtr();
 
+  // cudaStreamCreateWithFlags(&stream_, cudaDeviceScheduleYield);
+  // cudaStreamCreateWithFlags(&stream_, cudaDeviceScheduleBlockingSync);
   cudaStreamCreate(&stream_);
 }
 
