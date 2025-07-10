@@ -102,6 +102,9 @@ CPUMonitorBase::CPUMonitorBase(const std::string & node_name, const rclcpp::Node
   pub_cpu_usage_ =
     this->create_publisher<tier4_external_api_msgs::msg::CpuUsage>("~/cpu_usage", durable_qos);
 
+  pub_cpu_metrics_ =
+    this->create_publisher<tier4_external_api_msgs::msg::MetricArray>("~/cpu_metrics", durable_qos);
+
   using namespace std::literals::chrono_literals;
   // Start timer for collecting cpu statistics
   timer_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -585,6 +588,49 @@ void CPUMonitorBase::publishCpuUsage(tier4_external_api_msgs::msg::CpuUsage usag
   pub_cpu_usage_->publish(usage);
 }
 
+void CPUMonitorBase::publishCpuMetrics()
+{
+  tier4_external_api_msgs::msg::MetricArray metric_array;
+
+  auto make_metric = [&](double value, const std::string &metric_name, const std::string &core_name) {
+    tier4_external_api_msgs::msg::Metric metric;
+    tier4_external_api_msgs::msg::MetricTag tag_host;
+    tier4_external_api_msgs::msg::MetricTag tag_name;
+    tier4_external_api_msgs::msg::MetricTag tag_core;
+
+    tag_host.name = "host_name";
+    tag_host.value = hostname_;
+
+    tag_name.name = "metric_name";
+    tag_name.value = metric_name;
+
+    tag_core.name = "core_name";
+    tag_core.value = core_name;
+
+    metric.tag_array.push_back(tag_host);
+    metric.tag_array.push_back(tag_name);
+    if (!core_name.empty()) {
+      metric.tag_array.push_back(tag_core);
+    }
+    metric.value = value;
+
+    return metric;
+  };
+
+  std::lock_guard<std::mutex> lock_snapshot(mutex_snapshot_);
+
+  for (size_t i = 0; i < temperature_data_.core_data.size(); ++i) {
+    metric_array.metric_array.push_back(make_metric(static_cast<double>(temperature_data_.core_data[i].temperature), "temperature", std::to_string(i)));
+  }
+
+  metric_array.metric_array.push_back(make_metric(load_data_.load_average[0], "load_average", ""));
+
+
+  metric_array.stamp = this->now();
+
+  pub_cpu_metrics_->publish(metric_array);
+}
+
 void CPUMonitorBase::onTimer()
 {
   checkTemperature();
@@ -592,4 +638,6 @@ void CPUMonitorBase::onTimer()
   checkLoad();
   checkFrequency();
   checkThermalThrottling();
+
+  publishCpuMetrics();
 }

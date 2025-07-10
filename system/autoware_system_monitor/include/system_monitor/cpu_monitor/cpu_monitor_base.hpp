@@ -28,6 +28,7 @@
 
 #include <tier4_external_api_msgs/msg/cpu_status.hpp>
 #include <tier4_external_api_msgs/msg/cpu_usage.hpp>
+#include <tier4_external_api_msgs/msg/metric_array.hpp>
 
 #include <atomic>
 #include <climits>
@@ -158,6 +159,12 @@ protected:
    */
   virtual void publishCpuUsage(tier4_external_api_msgs::msg::CpuUsage usage);
 
+  /**
+   * @brief publish CPU metrics
+   * @param [in] usage Memory usage
+   */
+  void publishCpuMetrics();
+
   // Updater won't be changed after initialization. No need to protect it with mutex.
   diagnostic_updater::Updater updater_;  //!< @brief Updater class which advertises to /diagnostics
 
@@ -213,6 +220,7 @@ protected:
 
   // Publisher
   rclcpp::Publisher<tier4_external_api_msgs::msg::CpuUsage>::SharedPtr pub_cpu_usage_;
+  rclcpp::Publisher<tier4_external_api_msgs::msg::MetricArray>::SharedPtr pub_cpu_metrics_;
 
   rclcpp::TimerBase::SharedPtr timer_;  //!< @brief timer to collect cpu statistics
   rclcpp::CallbackGroup::SharedPtr timer_callback_group_;  //!< @brief Callback Group

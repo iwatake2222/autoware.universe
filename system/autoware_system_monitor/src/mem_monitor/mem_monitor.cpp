@@ -44,6 +44,12 @@ MemMonitor::MemMonitor(const rclcpp::NodeOptions & options)
   if (!bp::search_path("edac-util").empty()) {
     updater_.add("Memory ECC", this, &MemMonitor::checkEcc);
   }
+
+  // Publisher
+  rclcpp::QoS durable_qos{1};
+  durable_qos.transient_local();
+  pub_memory_metrics_ =
+    this->create_publisher<tier4_external_api_msgs::msg::MetricArray>("~/memory_metrics", durable_qos);
 }
 
 void MemMonitor::update()
@@ -93,7 +99,10 @@ void MemMonitor::checkUsage(diagnostic_updater::DiagnosticStatusWrapper & stat)
   std::vector<std::string> list;
   float usage;
   size_t mem_total = 0;
+  size_t mem_used = 0;
+  size_t mem_free = 0;
   size_t mem_shared = 0;
+  size_t mem_buff_cache = 0;
   size_t mem_available = 0;
   size_t used_plus = 0;
 
@@ -118,7 +127,10 @@ void MemMonitor::checkUsage(diagnostic_updater::DiagnosticStatusWrapper & stat)
     // Physical memory
     if (index == 1) {
       mem_total = std::atoll(list[1].c_str());
+      mem_used = std::atoll(list[2].c_str());
+      mem_free = std::atoll(list[3].c_str());
       mem_shared = std::atoll(list[4].c_str());
+      mem_buff_cache = std::atoll(list[5].c_str());
       mem_available = std::atoll(list[6].c_str());
 
       // available divided by total is available memory including calculation for buff/cache,
@@ -157,6 +169,8 @@ void MemMonitor::checkUsage(diagnostic_updater::DiagnosticStatusWrapper & stat)
   }
 
   stat.summary(level, usage_dict_.at(level));
+
+  publishMemoryMetrics(usage, mem_total, mem_used, mem_free, mem_shared, mem_buff_cache, mem_available);
 
   // Measure elapsed time since start time and report
   SystemMonitorUtility::stopMeasurement(t_start, stat);
@@ -226,6 +240,42 @@ std::string MemMonitor::toHumanReadable(const std::string & str)
   const char * format = (count >= 3 || (size > 0 && size < 10)) ? "{:.1f}{}" : "{:.0f}{}";
   return fmt::format(format, size, units[count]);
 }
+
+void MemMonitor::publishMemoryMetrics(float usage, size_t mem_total, size_t mem_used, size_t mem_free, size_t mem_shared, size_t mem_buff_cache, size_t mem_available)
+{
+  tier4_external_api_msgs::msg::MetricArray metric_array;
+
+  auto make_metric = [&](double value, const std::string &metric_name) {
+    tier4_external_api_msgs::msg::Metric metric;
+    tier4_external_api_msgs::msg::MetricTag tag_host;
+    tier4_external_api_msgs::msg::MetricTag tag_name;
+
+    tag_host.name = "host_name";
+    tag_host.value = hostname_;
+
+    tag_name.name = "metric_name";
+    tag_name.value = metric_name;
+
+    metric.tag_array.push_back(tag_host);
+    metric.tag_array.push_back(tag_name);
+    metric.value = value;
+
+    return metric;
+  };
+
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(usage), "usage"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_total), "mem_total"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_used), "mem_used"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_free), "mem_free"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_shared), "mem_shared"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_buff_cache), "mem_buff_cache"));
+  metric_array.metric_array.push_back(make_metric(static_cast<double>(mem_available), "mem_available"));
+
+  metric_array.stamp = this->now();
+
+  pub_memory_metrics_->publish(metric_array);
+}
+
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(MemMonitor)
