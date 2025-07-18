@@ -97,7 +97,7 @@ void MemMonitor::checkUsage(diagnostic_updater::DiagnosticStatusWrapper & stat)
   std::string line;
   int index = 0;
   std::vector<std::string> list;
-  float usage;
+  float usage = 0.0f;
   size_t mem_total = 0;
   size_t mem_shared = 0;
   size_t mem_available = 0;
